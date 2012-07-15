@@ -20,5 +20,7 @@
 	<true/>
 	<key>ShowSeconds</key>
 	<true/>
+	<key>RecentTimerIntervals</key>
+	<array/>
 </dict>
 </plist>
