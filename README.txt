@@ -1,3 +1,5 @@
+This is a fork of Menubar Countdown developed by Capable Hands Technologies.
+
 Menubar Countdown
 Version 1.2
 Copyright 2009 Capable Hands Technologies, Inc.
