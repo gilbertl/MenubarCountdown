@@ -33,6 +33,8 @@ extern NSString *UserDefaultsAnnouncementTextKey;             ///< Text to be sp
 extern NSString *UserDefaultsShowAlertWindowOnExpirationKey;  ///< Is alert window enabled?
 extern NSString *UserDefaultsShowStartDialogOnLaunchKey;      ///< Show start dialog when app launches?
 extern NSString *UserDefaultsShowSeconds;                     ///< Show seconds in menubar?
+extern NSString *UserDefaultsRecentTimerIntervals;
+
 
 /// \brief Handles registration of NSUserDefaults settings
 @interface UserDefaults : NSObject

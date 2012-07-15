@@ -38,6 +38,9 @@
 - (void)announceTimerExpired;
 - (NSString*)announcementText;
 - (void)showTimerExpiredAlert;
+- (void)removeOldIntervals:(NSArray*)oldIntervals renderNew:(NSArray*)newIntervals;
+- (void)reallyStartTimer:(int)seconds;
+- (NSString *)timeToString:(int)time showSeconds:(BOOL)showSeconds;
 @end
 
 
@@ -93,6 +96,51 @@
     if ([defaults boolForKey:UserDefaultsShowStartDialogOnLaunchKey]) {
         [self startTimer:self];
     }
+    
+    
+    // render the dynamic menu
+    [self removeOldIntervals:nil 
+                   renderNew:[[NSUserDefaults standardUserDefaults] arrayForKey:UserDefaultsRecentTimerIntervals]];
+    [defaults addObserver:self
+               forKeyPath:UserDefaultsRecentTimerIntervals
+                  options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld
+                  context:nil];
+
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath 
+                      ofObject:(id)object 
+                        change:(NSDictionary *)change 
+                       context:(void *)context {
+    if ([keyPath isEqualToString:UserDefaultsRecentTimerIntervals]) {
+        [self removeOldIntervals:[change objectForKey:@"old"]
+                       renderNew:[change objectForKey:@"new"]];
+    }
+}
+
+- (void)removeOldIntervals:(NSArray *)oldIntervals renderNew:(NSArray *)newIntervals {
+    NSUInteger LOCATION_IDX = 4;
+    for (int i = 0; i < [oldIntervals count]; i++)
+    {
+        [menu removeItemAtIndex:LOCATION_IDX];
+    }
+     
+    NSUInteger idx = [newIntervals count];
+    for (NSNumber *interval in [newIntervals reverseObjectEnumerator]) {
+        idx--;
+        NSMenuItem *mi = [menu insertItemWithTitle:[self timeToString:[interval intValue] showSeconds:true]
+                                            action:@selector(onMenuShortcutClick:) 
+                                     keyEquivalent:@"" 
+                                           atIndex:LOCATION_IDX];
+        [mi setTag:idx];
+        [mi setTarget:self];
+    }
+}
+
+- (void)onMenuShortcutClick:(id)sender {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray *recentIntervals = [defaults arrayForKey:UserDefaultsRecentTimerIntervals];
+    [self reallyStartTimer:[[recentIntervals objectAtIndex:[sender tag]] intValue]];
 }
 
 
@@ -100,17 +148,22 @@
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     bool showSeconds = [defaults boolForKey:UserDefaultsShowSeconds];
 
+    [statusItem setTitle:[self timeToString:timeRemaining showSeconds:showSeconds]];
+}
+
+- (NSString *)timeToString:(int)time
+         showSeconds:(BOOL)showSeconds {
     if (!showSeconds) {
         // Round timeRemaining up to the next minute
-        double minutes = (double)timeRemaining / 60.0;
-        timeRemaining = (int)ceil(minutes) * 60;
+        double minutes = (double)time / 60.0;
+        time = (int)ceil(minutes) * 60;
     }
-
-    int hours = timeRemaining / 3600;
-    timeRemaining %= 3600;
-    int minutes = timeRemaining / 60;
-    int seconds = timeRemaining % 60;
-
+    
+    int hours = time / 3600;
+    time %= 3600;
+    int minutes = time / 60;
+    int seconds = time % 60;
+    
     // TODO: Use localized time-formatting function
     NSString* timeString;
     if (showSeconds) {
@@ -121,8 +174,7 @@
         timeString = [NSString stringWithFormat:@"%02d:%02d",
                       hours, minutes];
     }
-
-    [statusItem setTitle:timeString];
+    return timeString;
 }
 
 
@@ -166,10 +218,28 @@
     [self dismissTimerExpiredAlert:sender];
 
     [startTimerDialogController dismissDialog:sender];
+    
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults synchronize];
 
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    int timerIntervalSecs = (int)[startTimerDialogController timerInterval];
+    
+    NSMutableArray *recentTimerIntervals = 
+        [NSMutableArray arrayWithArray:[defaults arrayForKey:UserDefaultsRecentTimerIntervals]];
+    NSUInteger MAX_INTERVALS = 5;
+    [recentTimerIntervals insertObject:[NSNumber numberWithInteger:timerIntervalSecs] atIndex:0];
+    if ([recentTimerIntervals count] > MAX_INTERVALS)
+    {
+        [recentTimerIntervals removeLastObject];
+    }
+    [defaults setObject:recentTimerIntervals forKey:UserDefaultsRecentTimerIntervals];
+    
+    [self reallyStartTimer:timerIntervalSecs];
+    
+}
 
-    timerSettingSeconds = (int)[startTimerDialogController timerInterval];
+- (void)reallyStartTimer:(int)seconds {
+    timerSettingSeconds = seconds;
     self.timerIsRunning = YES;
     self.canResume = NO;
     [stopwatch reset];
